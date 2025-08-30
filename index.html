@@ -290,6 +290,45 @@
     </section>
   </div>
 
+
+  <!-- Footer -->
+<footer class="bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-6 py-6 mt-8 border-t border-gray-300 dark:border-gray-700">
+  <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+
+    <!-- Left: Copyright -->
+    <div class="text-sm text-gray-600 dark:text-gray-400">
+      &copy; 2025 <span class="font-semibold">Zakariye</span>. All rights reserved.
+    </div>
+
+    <!-- Right: Social links -->
+    <div class="flex gap-4 items-center">
+
+      <!-- Gmail -->
+      <a href="mailto:engzaki410@gmail.com" target="_blank" class="hover:text-red-600 transition-colors" title="Email">
+        <i class="fa-solid fa-envelope fa-lg"></i>
+      </a>
+
+      <!-- WhatsApp -->
+      <a href="https://wa.me/252617125558" target="_blank" class="hover:text-green-500 transition-colors" title="WhatsApp">
+        <i class="fa-brands fa-whatsapp fa-lg"></i>
+      </a>
+
+      <!-- Facebook -->
+      <a href="https://www.facebook.com/share/19ayTrQCzP/" target="_blank" class="hover:text-blue-800 transition-colors" title="Facebook">
+        <i class="fa-brands fa-facebook fa-lg"></i>
+      </a>
+
+      <!-- GitHub -->
+      <a href="https://github.com/Zakariye-Salah/" target="_blank" class="hover:text-gray-900 dark:hover:text-white transition-colors" title="GitHub">
+        <i class="fa-brands fa-github fa-lg"></i>
+      </a>
+
+    </div>
+  </div>
+</footer>
+
+
+
 <!-- Add jsPDF library (add in your HTML <head> or before your script) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -335,7 +374,7 @@ const translations = {
     description: "Sheyga lagatay",
     balance: "Hadhaaga",
     actions: "Hawlaha",
-    exportInvoices: "Dhoofin Invoices",
+    exportInvoices: "Degso Invoices",
     login: "Gali",
     editUser: "Beddel Isticmaalaha",
     clearPaid: "Tirtir bixiyaasha",
@@ -692,9 +731,10 @@ function renderInvoices() {
       ? 'bg-gray-50 dark:bg-gray-700'
       : 'bg-gray-200 dark:bg-gray-600';
 
-    const statusClasses = status === 'paid'
-      ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100'
-      : 'bg-gray-300 text-gray-900 dark:bg-gray-500 dark:text-gray-100';
+      const statusClasses = status === 'paid'
+  ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100'
+  : 'bg-red-500 text-white dark:bg-red-700 dark:text-gray-100'; // red only for unpaid
+
 
     const statusText = status === 'paid' ? labels.paidBtn : labels.unpaidBtn;
 
@@ -1213,10 +1253,12 @@ function duplicateInvoice(id) {
   alert("Invoice duplicated!");
 }
 
-// Bulk WhatsApp reminders
+// Bulk WhatsApp/sms reminders
 document.getElementById('sendAllReminders').addEventListener('click', () => {
-  const unpaidInvoices = invoices.filter(inv => inv.supermarketName === currentUser.supermarketName && inv.status === 'unpaid');
-  
+  const unpaidInvoices = invoices.filter(
+    inv => inv.supermarketName === currentUser.supermarketName && inv.status === 'unpaid'
+  );
+
   if (unpaidInvoices.length === 0) {
     alert('No unpaid invoices to send.');
     return;
@@ -1224,24 +1266,46 @@ document.getElementById('sendAllReminders').addEventListener('click', () => {
 
   const method = document.getElementById('reminderMethod').value;
 
-  unpaidInvoices.forEach((inv, index) => {
+  // Group invoices by customer phone
+  const invoicesByCustomer = {};
+  unpaidInvoices.forEach(inv => {
     const phone = normalizePhone(inv.phone);
-    const message = `Xasuusin: ${inv.name}, Lacagta Laguugu Leeyahay Waa: $${fmt(inv.balance)} Fadlan iska bixi ${currentUser.supermarketName} numberka ${currentUser.supermarketPhone}`;
+    if (!invoicesByCustomer[phone]) invoicesByCustomer[phone] = [];
+    invoicesByCustomer[phone].push(inv);
+  });
 
+  let index = 0;
+  for (const [phone, invs] of Object.entries(invoicesByCustomer)) {
+    const customerName = invs[0].name || "Customer";
+    const totalBalance = invs.reduce((sum, i) => sum + (i.balance || 0), 0);
+
+    // Build a professional invoice list with emojis
+    const invoiceList = invs
+      .map(i => `🧾 Invoice #${i.invoiceNumber || 'N/A'}: $${fmt(i.balance)}`)
+      .join('\n');
+    
+
+    const message = `Xasuusin: ${customerName}\nWaxaa laguugu leeyahay lacagaha soo socda:\n${invoiceList}\nTotal: $${fmt(totalBalance)}\nFadlan iska bixi Dukaanka: ${currentUser.supermarketName}, Numberka ${currentUser.supermarketPhone}`;
+
+    // Create URL
     const url = method === 'wa'
       ? `https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(message)}`
       : `sms:${phone}?body=${encodeURIComponent(message)}`;
 
+    // Open URL in a new tab/window
     const win = window.open(url, "_blank");
 
-    // Auto-close after 3 seconds
+    // Auto-close after a few seconds
     setTimeout(() => {
       if (win) win.close();
-    }, 3000 + index * 500); // stagger slightly for multiple tabs
-  });
+    }, 3000 + index * 500);
 
-  // alert(`Opened ${unpaidInvoices.length} ${method === 'wa' ? 'WhatsApp' : 'SMS'} messages for unpaid invoices.`);
+    index++;
+  }
+
+  alert(`Prepared ${Object.keys(invoicesByCustomer).length} ${method === 'wa' ? 'WhatsApp' : 'SMS'} messages for unpaid invoices.`);
 });
+
 // Somali names for days
 const daysSomali = ["Axad", "Isniin", "Talaado", "Arbaco", "Khamiis", "Jimco", "Sabti"];
 
